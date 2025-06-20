@@ -1,8 +1,10 @@
 FROM ubuntu:jammy
-
 ARG USERNAME
 ARG USER_UID
 ARG USER_GID=$USER_UID
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Set the locale
 RUN apt-get update && apt-get install -y locales && \
@@ -19,15 +21,14 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Setup the sources
 RUN apt-get update && apt-get install -y software-properties-common curl sudo && \
-    add-apt-repository universe && \
     curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-# Install ROS 2 packages
+# Install ROS2 Humble packages
 RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y ros-humble-desktop 
+    apt-get install -y ros-humble-desktop
 
-# Install MAVROS and dependencies
+# Install MAVROS for ROS2 and dependencies
 RUN apt-get update && apt-get install -y \
     ros-humble-mavros \
     ros-humble-mavros-extras \
@@ -35,12 +36,12 @@ RUN apt-get update && apt-get install -y \
     python3-pip
 
 # Install GeographicLib datasets required by MAVROS
-RUN wget https://raw.githubusercontent.com/mavlink/mavros/master/mavros/scripts/install_geographiclib_datasets.sh && \
+RUN wget https://raw.githubusercontent.com/mavlink/mavros/ros2/mavros/scripts/install_geographiclib_datasets.sh && \
     chmod +x install_geographiclib_datasets.sh && \
     ./install_geographiclib_datasets.sh && \
     rm install_geographiclib_datasets.sh
 
-# install bootstrap tools
+# Install bootstrap tools
 RUN apt-get update && apt-get install --no-install-recommends -y \
     build-essential \
     git \
@@ -48,29 +49,18 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     iputils-ping \
     wget \
     python3-colcon-common-extensions \
-    python3-colcon-mixin \
     python3-rosdep \
-    python3-vcstool \
     && rm -rf /var/lib/apt/lists/*
 
-# bootstrap rosdep
+# Bootstrap rosdep
 RUN rosdep init && \
-  rosdep update --rosdistro humble
+    rosdep update
 
-# Create a MAVROS configuration directory and set parameters to allow motor control
+# Create a MAVROS configuration directory and set parameters to allow all plugins
 RUN mkdir -p /opt/ros/humble/share/mavros/config && \
-    echo "# MAVROS configuration to allow motor control\n\
+    echo "# MAVROS configuration to allow all plugins\n\
 plugin_allowlist:\n\
-  - command\n\
-  - setpoint_raw\n\
-  - setpoint_velocity\n\
-  - setpoint_attitude\n\
-  - setpoint_position\n\
-  - rc_io\n\
-  - safety\n\
-  - sys_status\n\
-  - sys_time\n\
-  - imu\n\
+  - '*'\n\
 \n\
 # Enable motor control\n\
 safety_allowed_area:\n\
